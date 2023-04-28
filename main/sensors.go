@@ -31,6 +31,8 @@ const (
 	MPUREG_WHO_AM_I_VAL_UNKNOWN = 0x75 // Unknown MPU found on recent batch of gy91 boards see discussion 182
 	ICMREG_WHO_AM_I     = 0x00
 	ICMREG_WHO_AM_I_VAL = 0xEA // Expected value.
+	PRESREG_WHO_AM_I      = 0xD0
+	PRESREG_WHO_AM_I_VAL_BME = 0x60 // Expected value for BME-280
 )
 
 var (
@@ -78,11 +80,33 @@ func pollSensors() {
 }
 
 func initPressureSensor() (ok bool) {
-	bmp, err := sensors.NewBMP280(&i2cbus, 100*time.Millisecond)
-	if err == nil {
-		myPressureReader = bmp
-		return true
+	// Check both high and low addresses if the chip is the BMP-280 or MPE-280.
+	v, err := i2cbus.ReadByteFromReg(0x76, PRESREG_WHO_AM_I)
+	if err != nil {
+		v, err = i2cbus.ReadByteFromReg(0x77, PRESREG_WHO_AM_I)
+		if err != nil {
+			log.Printf("Error identifying pressure sensor: %s\n", err.Error())
+			return false
+		}
 	}
+
+	if v == PRESREG_WHO_AM_I_VAL_BME {
+		bmp, err := sensors.NewBME280(&i2cbus, 100*time.Millisecond)
+		if err == nil {
+			log.Printf("BME-280 connected.\n")
+			myPressureReader = bmp
+			return true
+		}
+	} else {
+		bmp, err := sensors.NewBMP280(&i2cbus, 100*time.Millisecond)
+		if err == nil {
+			log.Printf("BMP-280 connected.\n")
+			myPressureReader = bmp
+			return true
+		}
+	}
+
+	log.Printf("Could not identify pressure sensor. v=%02x.\n", v)
 
 	//TODO westphae: make bmp180.go to fit bmp interface
 
