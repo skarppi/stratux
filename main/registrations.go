@@ -10,10 +10,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
-	"strconv"
+	"io/ioutil"
+	"log"
 	"math"
+	"strconv"
+	"strings"
 )
 
 type Stride struct {
@@ -160,7 +163,12 @@ func icao2reg(icao_addr uint32) (string, bool) {
 			return tail, success
 		}
 
-		return stride_reg(icao_addr)
+		tail, success = stride_reg(icao_addr)
+		if success {
+			return tail, success
+		}
+
+		return lookupTailNumber(icao_addr)
 	}
 }
 
@@ -267,4 +275,63 @@ func n_reg(icao_addr uint32) (string, bool) {
 	}
 
 	return "N" + a_char + b_char + c_char + d_char + e_char, true
+}
+
+var tailNumberCache = make(map[uint32]string)
+
+func lookupTailNumber(icao_addr uint32) (string, bool) {
+	if tail, ok := tailNumberCache[icao_addr]; ok {
+		return tail, true
+	}
+
+	hex := strings.ToUpper(strconv.FormatUint(uint64(icao_addr), 16))
+
+	if readDb(hex, 1) {
+		if tail, ok := tailNumberCache[icao_addr]; ok {
+			return tail, true
+		}
+	}
+	return "", false
+}
+
+type Registration struct {
+	reg string `json:"r"`
+	typ string `json:"t"`
+}
+
+func readDb(hex string, level int) bool {
+	prefix := hex[0:level]
+
+	ddb, err := ioutil.ReadFile(STRATUX_HOME + "/dump1090/public_html/db/" + prefix + ".json")
+	if err != nil {
+		log.Printf("Failed to read ICAO registration db " + hex + ".json: " + err.Error())
+		return false
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(ddb, &data)
+	if err != nil {
+		log.Printf("Failed to parse ICAO registration db " + hex + " : " + err.Error())
+		return false
+	}
+
+	children := data["children"].([]interface{})
+	for _, child := range children {
+		if child == hex[0:level+1] {
+			return readDb(hex, level+1)
+		}
+	}
+
+	for key, json := range data {
+		if key != "children" {
+			data := json.(map[string]interface{})
+			addr, _ := strconv.ParseUint(prefix+key, 16, 32)
+			if data["r"] != nil {
+				tailNumberCache[uint32(addr)] = data["r"].(string)
+			}
+		}
+	}
+	log.Printf("Successfully parsed ICAO registration db %v with %v items", prefix, len(data))
+
+	return true
 }
