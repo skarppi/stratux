@@ -58,6 +58,7 @@ optinstall: www ogn/ddb.json
 	mkdir -p $(STRATUX_HOME)/lib
 	mkdir -p $(STRATUX_HOME)/mapdata
 	chmod a+rwx $(STRATUX_HOME)/mapdata # so users can upload their stuff as user pi
+	mkdir -p $(STRATUX_HOME)/db
 
 	# binaries
 	cp -f stratuxrun $(STRATUX_HOME)/bin/
@@ -72,6 +73,9 @@ optinstall: www ogn/ddb.json
 
 	# map data
 	cp -ru mapdata/* $(STRATUX_HOME)/mapdata/
+
+	# aircraft registration database
+	cp -ru dump1090/public_html/db/ $(STRATUX_HOME)/db/
 
 	# OGN stuff
 	cp -f ogn/ddb.json ogn/*ogn-tracker-bin-*.zip ogn/install-ogntracker-firmware-pi.sh ogn/fetch_ddb.sh $(STRATUX_HOME)/ogn
