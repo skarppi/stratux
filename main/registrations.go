@@ -315,11 +315,13 @@ func readDb(hex string, level int) bool {
 		return false
 	}
 
-	children := data["children"].([]interface{})
-	for _, child := range children {
-		if child == hex[0:level+1] {
-			return readDb(hex, level+1)
-		}
+	if data["children"] != nil {
+		children := data["children"].([]interface{})
+		for _, child := range children {
+			if child == hex[0:level+1] {
+				return readDb(hex, level+1)
+			}
+		}	
 	}
 
 	for key, json := range data {
