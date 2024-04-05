@@ -1232,6 +1232,9 @@ type settings struct {
 	GpsManualDevice	     string         // default: /dev/ttyAMA0
     GpsManualChip        string         // ublox8, ublox9, ublox
 	GpsManualTargetBaud  int            // default: 115200
+
+	// Audio recording
+	AudioRecordingEnabled bool
 }
 
 type status struct {
@@ -1291,6 +1294,9 @@ type status struct {
 	OGN_tx_enabled                             bool // If ogn-rx-eu uses a local tx module for transmission
 
 	OGNPrevRandomAddr                          string    // when OGN is in random stealth mode, it's ID changes randomly - keep the previous one so we can filter properly
+
+	AudioRecordingFile                         string
+	AudioRecordingLoundness                    float32
 }
 
 var globalSettings settings
@@ -1479,6 +1485,9 @@ func printStats() {
 			log.Printf(" - GPS vertical velocity: %.02f ft/sec; GPS vertical accuracy: %v m\n", mySituation.GPSVerticalSpeed, mySituation.GPSVerticalAccuracy)
 		}
 		log.Printf(" - Mode-S Distance factors (<5000, <10000, >10000): %f, %f, %f", estimatedDistFactors[0], estimatedDistFactors[1], estimatedDistFactors[2])
+		if globalSettings.AudioRecordingEnabled {
+			log.Printf(" - Audio recording: loudness=%.1f db, file=%s", globalStatus.AudioRecordingLoundness, globalStatus.AudioRecordingFile)
+		}
 		sensorsOutput := make([]string, 0)
 		if globalSettings.IMU_Sensor_Enabled {
 			sensorsOutput = append(sensorsOutput, fmt.Sprintf("Last IMU read: %s", stratuxClock.HumanizeTime(mySituation.AHRSLastAttitudeTime)))
@@ -1487,7 +1496,7 @@ func printStats() {
 			sensorsOutput = append(sensorsOutput, fmt.Sprintf("Last BMP read: %s", stratuxClock.HumanizeTime(mySituation.BaroLastMeasurementTime)))
 		}
 		if len(sensorsOutput) > 0 {
-			log.Printf("- " + strings.Join(sensorsOutput, ", ") + "\n")
+			log.Printf(" - " + strings.Join(sensorsOutput, ", ") + "\n")
 		}
 		// Check if we're using more than 95% of the free space. If so, throw a warning (only once).
 		if usage.Usage() > 0.95 {
@@ -1741,6 +1750,9 @@ func main() {
 
 		// Start the AHRS sensor monitoring.
 		initI2CSensors()
+
+		// Start recording audio
+		go initAudio()
 	}
 
 	// Start the GPS external sensor monitoring.

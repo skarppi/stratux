@@ -175,6 +175,9 @@ function StatusCtrl($rootScope, $scope, $state, $http, $interval, craftService) 
 				// $('#CPUTemp').text('unavailable');
 			}
 
+			$scope.AudioRecordingFile = status.AudioRecordingFile;
+			$scope.AudioRecordingLoundness = status.AudioRecordingLoundness;
+
 			$scope.$apply(); // trigger any needed refreshing of data
 		};
 	}

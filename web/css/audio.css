@@ -1,0 +1,12 @@
+.volume-slider-container {
+    height:10px;
+    position:relative;
+    background-color:#ddd;
+    margin-bottom: 20px;
+}
+
+.volume-slider {
+    height:100%;
+    width:100%;
+    position:relative;
+}

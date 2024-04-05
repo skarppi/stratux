@@ -529,6 +529,9 @@ func handleSettingsSetRequest(w http.ResponseWriter, r *http.Request) {
 						globalSettings.PWMDutyMin = int(val.(float64))
 						reconfigureFancontrol = true
 
+					case "AudioRecordingEnabled":
+						globalSettings.AudioRecordingEnabled = val.(bool)
+
 					default:
 						log.Printf("handleSettingsSetRequest:json: unrecognized key:%s\n", key)
 					}
@@ -1140,6 +1143,7 @@ func managementInterface() {
 	//http.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log"))))
 	http.Handle("/mapdata/styles/", http.StripPrefix("/mapdata/styles/", http.FileServer(http.Dir(STRATUX_HOME + "/mapdata/styles"))))
 	http.HandleFunc("/logs/", viewLogs)
+	http.HandleFunc("/audio/", viewAudioRecordings)
 
 	http.HandleFunc("/gdl90",
 		func(w http.ResponseWriter, req *http.Request) {
@@ -1192,6 +1196,7 @@ func managementInterface() {
 	http.HandleFunc("/getSatellites", handleSatellitesRequest)
 	http.HandleFunc("/getSettings", handleSettingsGetRequest)
 	http.HandleFunc("/setSettings", handleSettingsSetRequest)
+	http.HandleFunc("/audiostream", handleAudioStream)
 	http.HandleFunc("/restart", handleRestartRequest)
 	http.HandleFunc("/shutdown", handleShutdownRequest)
 	http.HandleFunc("/reboot", handleRebootRequest)

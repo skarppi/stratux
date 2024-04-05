@@ -38,6 +38,7 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/gordonklaus/portaudio v0.0.0-20230709114228-aafa478834f5 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/kylelemons/go-gypsy v1.0.0 // indirect
 	github.com/lib/pq v1.10.0 // indirect
@@ -47,6 +48,7 @@ require (
 	github.com/prometheus/common v0.18.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/skelterjohn/go.matrix v0.0.0-20130517144113-daa59528eefd // indirect
+	github.com/sunicy/go-lame v0.0.0-20200422031049-1c192eaafa39 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/image v0.0.0-20210216034530-4410531fe030 // indirect
 	golang.org/x/sys v0.1.0 // indirect

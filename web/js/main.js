@@ -99,6 +99,12 @@ app.config(function ($stateProvider, $urlRouterProvider) {
 			controller: 'MapCtrl',
 			reloadOnSearch: false
 		})
+		.state('audio', {
+			url: '/audio',
+			templateUrl: 'plates/audio.html',
+			controller: 'AudioCtrl',
+			reloadOnSearch: false
+		})
         .state('developer', {
 			url: '/developer',
 			templateUrl: 'plates/developer.html',

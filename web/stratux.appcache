@@ -25,7 +25,9 @@ CACHE MANIFEST
 /plates/js/towers.js
 /plates/js/ahrs.js
 /plates/js/logs.js
+/plates/js/audio.js
 /plates/settings-help.html
+/plates/audio.html
 /plates/logs.html
 /plates/towers.html
 /plates/gps.html
@@ -52,6 +54,7 @@ CACHE MANIFEST
 /css/addtohomescreen.css
 /css/main.css
 /css/ahrs.css
+/css/audio.css
 
 NETWORK:
 *
