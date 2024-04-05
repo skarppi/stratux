@@ -1,0 +1,32 @@
+<div class="list-group text-center">
+    <div class="list-group-item list-group-item-home">
+        <h2>Audio Recordings</h2>
+    </div>
+    <div class="list-group-item list-group-item-home">
+        <div>
+            <i class="fa fa-cloud feature-icon text-primary"></i>
+        </div>
+        <div ng-show="AudioRecordingFile.length > 0">
+            <H5>Current file: {{AudioRecordingFile}}</h5>
+            <div>
+                <b>Current loudness: </b>
+                {{AudioRecordingLoundness}} dB
+            </div>
+            <div class="volume-slider-container">
+                <div class="volume-slider" ng-style="{width: loudness_percent+'%', 'background-color': loudness_color}"></div>
+            </div>
+            <div>
+                <audio controls>
+                    <source src="/audiostream" type="audio/mpeg">
+                    Your browser does not support the audio element.
+              </audio>
+            </div>
+        </div>
+        <div ng-show="AudioRecordingFile.length == 0">
+            Not recording.
+        </div>
+        <div>
+            <a target="_blank" href="../audio/">Audio recordings</a>
+        </div>
+    </div>
+</div>

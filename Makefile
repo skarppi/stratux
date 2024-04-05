@@ -59,6 +59,7 @@ optinstall: www ogn/ddb.json
 	mkdir -p $(STRATUX_HOME)/mapdata
 	chmod a+rwx $(STRATUX_HOME)/mapdata # so users can upload their stuff as user pi
 	mkdir -p $(STRATUX_HOME)/db
+	mkdir -p $(STRATUX_HOME)/audio
 
 	# binaries
 	cp -f stratuxrun $(STRATUX_HOME)/bin/
