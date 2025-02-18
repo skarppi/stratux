@@ -1,9 +1,52 @@
 angular.module('appControllers').controller('AudioCtrl', AudioCtrl);      // get the main module contollers set
-AudioCtrl.$inject = ['$scope', '$state', '$http'];                        // Inject my dependencies
+AudioCtrl.$inject = ['$scope', '$state', '$http']; // Inject my dependencies
 
 // create our controller function with all necessary logic
 function AudioCtrl($scope, $state, $http) {
 	$scope.$parent.helppage = 'plates/audio-help.html';
+
+	var AudioRecordingEnabled = undefined;
+
+	function loadSettings(data) {
+		var settings = angular.fromJson(data);
+
+		$scope.AudioRecordingEnabled = settings.AudioRecordingEnabled;
+		AudioRecordingEnabled = settings.AudioRecordingEnabled;
+	}
+
+	function getSettings() {
+		// Simple GET request example (note: response is asynchronous)
+		$http.get(URL_SETTINGS_GET).
+		then(function (response) {
+			loadSettings(response.data);
+		}, function (response) {
+			$scope.rawSettings = "error getting settings";
+
+			AudioRecordingEnabled = false;
+		});
+	}
+
+	function setSettings(msg) {
+		// Simple POST request example (note: response is asynchronous)
+		$http.post(URL_SETTINGS_SET, msg).
+		then(function (response) {
+			loadSettings(response.data);
+		}, function (response) {
+			$scope.rawSettings = "error setting settings";
+			AudioRecordingEnabled = false;
+		});
+	}
+
+	getSettings();
+
+	$scope.$watch("AudioRecordingEnabled", function (newValue) {
+		if (newValue != AudioRecordingEnabled) {
+			var newsettings = {
+				"AudioRecordingEnabled": newValue
+			};
+			setSettings(angular.toJson(newsettings));
+		}
+	});
 
 	function connect($scope) {
 		if (($scope === undefined) || ($scope === null))
