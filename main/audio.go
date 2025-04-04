@@ -1,17 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
 	"os"
+
+	// "os/signal"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -27,89 +26,151 @@ import (
 //
 // MacOS:
 // brew install lame
+// brew install pkg-config
 // export CGO_CFLAGS="-I/opt/homebrew/opt/lame/include"
 // export CGO_LDFLAGS="-L/opt/homebrew/opt/lame/lib"
 
-var audioStreamer *streamer
+// type status struct {
+// 	AudioRecordingFile                         string
+// 	AudioRecordingLoundness                    float32
+// }
+// var globalStatus status
+// var STRATUX_HOME = "/opt/stratux/"
+// func main() {
+// 	sig := make(chan os.Signal, 1)
+// 	signal.Notify(sig, os.Interrupt, os.Kill)
+// 	go initPortAudio()
+
+// 	for {
+// 		select {
+// 		case <-sig:
+// 			log.Printf("Sig")
+// 			return
+// 		default:
+// 		}
+// 	}
+//  }
 
 func initAudio() {
 	timer := time.NewTicker(10 * time.Second)
 	for {
 		<-timer.C
 
-		// If it's not currently recording, try start
-		if globalSettings.AudioRecordingEnabled && len(globalStatus.AudioRecordingFile) == 0 {
+		// If it's not currently recording, try start when we have a valid system time
+		if isGPSClockValid() && globalSettings.AudioRecordingEnabled && len(globalStatus.AudioRecordingFile) == 0 {
 			go initPortAudio()
 		}
 	}
 }
 
-func initPortAudio() {
-	portaudio.Initialize()
-	defer portaudio.Terminate()
-
+func getCurrentFilename() (string) {
 	startTime := time.Now()
 	mp3FileName := startTime.Format("2006-01-02-150405") + ".mp3"
-	mp3File, _ := os.Create(STRATUX_HOME + "/audio/" + mp3FileName)
-	defer mp3File.Close()
-	log.Println("Audio output to", mp3FileName)
+	return mp3FileName
+}
 
-	// mp3 output is written into disk and streamed
-	mp3PipeReader, mp3PipeWriter := io.Pipe()
-	writers := io.MultiWriter(mp3PipeWriter, mp3File)
-	pcmWriter, err := lame.NewWriter(writers)
-	if err != nil {
-		log.Printf("Error initializing lame writer: %s\n", err.Error())
-		return
+func initMp3Output(inSampleRate int, mp3File *os.File) (*lame.Writer) {
+
+	pcmWriter, errWriter := lame.NewWriter(mp3File)
+	if errWriter != nil {
+		log.Printf("Error initializing lame writer: %s\n", errWriter.Error())
+		return nil
 	}
 
 	// encoding settings
 	pcmWriter.EncodeOptions.InNumChannels = 1
-	pcmWriter.EncodeOptions.InSampleRate = 44100
+	pcmWriter.EncodeOptions.InSampleRate = inSampleRate
 	pcmWriter.EncodeOptions.OutSampleRate = 16000
 	pcmWriter.EncodeOptions.OutQuality = 6
 	pcmWriter.ForceUpdateParams()
-	defer pcmWriter.Close()
+	
+	return pcmWriter
+}
 
-	stream, err := portaudio.OpenDefaultStream(
+func initPortAudio() {
+	log.Println("Initializing portaudio")
+	errInit := portaudio.Initialize()
+	if errInit != nil {
+		log.Printf("Error initializing portaudio: %s\n", errInit.Error())
+		return
+	}
+	defer log.Println("Deinitializing portaudio")
+	defer portaudio.Terminate()
+
+	inSampleRate := 44100
+
+	buffer := make([]int16, inSampleRate)
+
+	log.Println("Open portaudio stream")
+
+	stream, streamErr := portaudio.OpenDefaultStream(
 		1, 
 		0, 
-		float64(pcmWriter.EncodeOptions.InSampleRate), 
-		pcmWriter.EncodeOptions.InSampleRate / 2, // half a second buffer 
-		func(in []int16) {
-			globalStatus.AudioRecordingLoundness = loudness(&in)
-			//fmt.Printf("%.1f db\n", globalStatus.AudioRecordingLoundness)
-			binary.Write(pcmWriter, binary.LittleEndian, in)
-		})
-	if err != nil {
-		log.Printf("Error initializing portaudio stream: %s\n", err.Error())
+		float64(inSampleRate),
+		len(buffer),
+		buffer,
+	)
+	if streamErr != nil {
+		log.Printf("Error initializing portaudio stream: %s\n", streamErr.Error())
 		return
 	}
 
-	err = stream.Start()
-	if err != nil {
-		log.Printf("Error starting portaudio stream: %s\n", err.Error())
+	startErr := stream.Start()
+	if startErr != nil {
+		log.Printf("Error starting portaudio stream: %s\n", startErr.Error())
 		return
 	}
 	defer stream.Close()
 
-	globalStatus.AudioRecordingFile = mp3FileName
-	log.Println("Audio recording started")
+	log.Println("Opened portaudio stream")
 
-	audioStreamer = new(streamer)
-	audioStreamer.Input = mp3PipeReader
-	// how much to read from mp3 stream at once
-	audioStreamer.ReadBuff = 4000 // read buffer size
-	audioStreamer.QueueSize = 10 // queue size
-	audioStreamer.WriteBuff = 32768 // write buffer size
-	err = audioStreamer.init()
-	if err != nil {
-		log.Fatalln(err)
-		return
+	// wait until we receive any sound
+	globalStatus.AudioRecordingFile = "waiting"
+	globalStatus.AudioRecordingLoundness = loudness(&buffer)
+
+	log.Printf("Start waiting for portaudio sound, starting point %.1f db\n", globalStatus.AudioRecordingLoundness)
+
+	for globalSettings.AudioRecordingEnabled && globalStatus.AudioRecordingLoundness < -50 {
+		err := stream.Read()
+		if err != nil {
+			log.Printf("Error reading stream: %s\n", err.Error())
+			continue;
+		}
+
+		globalStatus.AudioRecordingLoundness = loudness(&buffer)	
+		log.Printf("Waiting portaudio sound, heard %.1f db\n", globalStatus.AudioRecordingLoundness)
 	}
 
-	// keep looping until disabled
-	audioStreamer.readLoop()
+	log.Printf("Done waiting for portaudio sound, now %.1f db\n", globalStatus.AudioRecordingLoundness)
+
+	if globalStatus.AudioRecordingLoundness > -50 {
+		log.Println("Audio recording starting")
+		mp3FileName := getCurrentFilename()
+		mp3File, _ := os.Create(STRATUX_HOME + "/audio/" + mp3FileName)
+		defer mp3File.Close()
+		globalStatus.AudioRecordingFile = mp3FileName
+		
+		pcmWriter := initMp3Output(inSampleRate, mp3File)
+		if pcmWriter == nil {
+			return
+		}
+		defer pcmWriter.Close()
+
+		log.Printf("Audio recording started to %s\n", mp3FileName)
+	
+		// keep looping until disabled
+		for globalSettings.AudioRecordingEnabled {
+			err := stream.Read()
+			if err != nil {
+				log.Printf("Error reading stream: %s\n", err.Error())
+				continue;
+			}
+	
+			globalStatus.AudioRecordingLoundness = loudness(&buffer)	
+			binary.Write(pcmWriter, binary.LittleEndian, buffer)
+		}
+
+	}
 
 	// cleanup
 	globalStatus.AudioRecordingFile = ""
@@ -128,101 +189,12 @@ func loudness(buffer *[]int16) float32 {
 	return float32(20 * math.Log10(float64(amplitude) / 32767.0))
 }
 
-type streamer struct {
-	sync.RWMutex
-	clients   map[uint64]chan []byte
-	id        uint64
-	ReadBuff  int
-	QueueSize int
-	WriteBuff int
-	Input     io.Reader
-	skipped   *int
-	Stop      chan bool
-}
-
-func (s *streamer) init() (err error) {
-	s.Lock()
-	defer s.Unlock()
-	s.skipped = new(int)
-	s.clients = make(map[uint64]chan []byte)
-	s.Stop = make(chan bool)
-	
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (s *streamer) addClient() (uint64, chan []byte) {
-	s.Lock()
-	defer s.Unlock()
-	s.id++
-	s.clients[s.id] = make(chan []byte, s.QueueSize)
-	return s.id, s.clients[s.id]
-}
-
-func (s *streamer) delClient(id uint64) {
-	log.Printf("Deleting client #%v", id)
-
-	s.Lock()
-	defer s.Unlock()
-	close(s.clients[id])
-	delete(s.clients, id)
-}
-
-func (s *streamer) send(b []byte) {
-	s.RLock()
-	defer s.RUnlock()
-	for _, v := range s.clients {
-		select {
-		case v <- b:
-		default:
-		}
-	}
-}
-
-func (s *streamer) readLoop() {
-	defer close(s.Stop)
-	for {
-		if !globalSettings.AudioRecordingEnabled {
-			return
-		}
-
-		buffer := make([]byte, s.ReadBuff)
-		_, err := io.ReadFull(s.Input, buffer)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		s.send(buffer)
-	}
-}
-
 func handleAudioStream(w http.ResponseWriter, r *http.Request) {
-	id, recieve := audioStreamer.addClient()
-	defer audioStreamer.delClient(id)
+	file := r.URL.Query().Get("file")
 
-	log.Printf("Starting client #%v", id)
-
-	// Set some headers
-	w.Header().Set("Content-Type", "audio/mpeg")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Server", "dumb-mp3-streamer")
-	//Send MP3 stream header
-	head := []byte{0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	//Send data in chunks
-	buffw := bufio.NewWriterSize(w, audioStreamer.WriteBuff)
-	if _, err := buffw.Write(head); err != nil {
-		return
-	}
-
-	for {
-		chunk := <-recieve
-		if _, err := buffw.Write(chunk); err != nil {
-			return
-		}
-	}
+	path := STRATUX_HOME + "/audio/" + file
+	log.Printf("Starting client #%v", path)	
+	http.ServeFile(w, r, path)
 }
 
 func viewAudioRecordings(w http.ResponseWriter, r *http.Request) {

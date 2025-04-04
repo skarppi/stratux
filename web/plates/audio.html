@@ -22,12 +22,6 @@
                     <div class="volume-slider-container">
                         <div class="volume-slider" ng-style="{width: loudness_percent+'%', 'background-color': loudness_color}"></div>
                     </div>
-                    <div>
-                        <audio controls>
-                            <source src="/audiostream" type="audio/mpeg">
-                            Your browser does not support the audio element.
-                      </audio>
-                    </div>
                 </div>
                 <div class="col-sm-12" ng-show="AudioRecordingFile.length == 0">
                     Not recording.
